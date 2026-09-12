@@ -12,7 +12,7 @@ export interface AppConfig {
    * Set GOOGLE_TOKEN_PERSIST=true when using a Railway Volume.
    */
   googleTokenPersist: boolean;
-  /** Shared secret required for HTTP /mcp. Empty in stdio-only local use. */
+  /** Optional shared secret for HTTP /mcp. When empty, /mcp is open. */
   mcpApiKey: string;
   port: number;
   logLevel: string;
@@ -66,11 +66,3 @@ export function assertGoogleCredentials(config: AppConfig): void {
   }
 }
 
-export function assertMcpApiKey(config: AppConfig): void {
-  if (!config.mcpApiKey) {
-    throw new AppError(
-      "AUTHENTICATION_REQUIRED",
-      "Missing MCP_API_KEY. Set a long random secret (e.g. openssl rand -hex 32) before starting the HTTP server.",
-    );
-  }
-}

@@ -78,7 +78,7 @@ GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/oauth2callback
 GOOGLE_TOKEN_PATH=.tokens/google-tokens.json
-MCP_API_KEY=                      # required for HTTP mode
+MCP_API_KEY=                      # optional; when set, required on /mcp
 LOG_LEVEL=info
 ```
 
@@ -106,7 +106,6 @@ npm run start:stdio
 ### Run the server (HTTP — Railway / remote clients)
 
 ```bash
-# Set MCP_API_KEY in .env first
 npm run dev:http
 ```
 
@@ -118,7 +117,7 @@ npm start
 ```
 
 Health: `GET /health` → `{ "status": "ok" }`  
-MCP: `POST /mcp` (requires `Authorization: Bearer <MCP_API_KEY>` or `X-API-Key`)
+MCP: `POST /mcp` — if `MCP_API_KEY` is set, send `Authorization: Bearer <key>` or `X-API-Key`
 
 Logs go to **stderr** (stdout is reserved for MCP JSON-RPC on stdio).
 
@@ -191,7 +190,7 @@ LOG_LEVEL=info
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REFRESH_TOKEN=...   # from local token.json after npm run auth
-MCP_API_KEY=...            # openssl rand -hex 32
+# MCP_API_KEY=...          # optional; omit to leave /mcp open
 ```
 
 6. Smoke test:
@@ -294,7 +293,7 @@ Common codes: `AUTHENTICATION_REQUIRED`, `INVALID_EMAIL`, `DOCUMENT_NOT_FOUND`, 
 
 - Never commit `.env`, `credential.json`, or token files.
 - Tokens, client secrets, and `MCP_API_KEY` are never logged.
-- HTTP `/mcp` requires `MCP_API_KEY` (`Authorization: Bearer` or `X-API-Key`).
+- HTTP `/mcp` is open unless `MCP_API_KEY` is set (`Authorization: Bearer` or `X-API-Key`).
 - OAuth scopes are minimized to compose, send, and documents.
 - Prefer drafting (`gmail_draft_email`) when send is not required.
 - Use HTTPS redirect URIs for non-local deployments.
@@ -323,7 +322,7 @@ Unit tests cover validation, MIME/Base64URL encoding, Docs append request constr
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Run MCP server over stdio via `tsx` |
-| `npm run dev:http` | Run Streamable HTTP server (`PORT`, API key required) |
+| `npm run dev:http` | Run Streamable HTTP server (`PORT`; optional `MCP_API_KEY`) |
 | `npm run auth` | Interactive Google OAuth login |
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm start` | Run compiled HTTP server (`dist/http.js`) |

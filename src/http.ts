@@ -9,13 +9,13 @@ import {
   extractApiKeyFromNodeRequest,
   isValidApiKey,
 } from "./middleware/apiKey.js";
-import { assertMcpApiKey, loadConfig } from "./utils/config.js";
+import { loadConfig } from "./utils/config.js";
 import { logger } from "./utils/logger.js";
 
 loadDotenv();
 
 const config = loadConfig();
-assertMcpApiKey(config);
+const mcpAuthEnabled = config.mcpApiKey.length > 0;
 
 const mcpHandler = createMcpHandler(() => createServer(config), {
   onerror: (error) => {
@@ -52,6 +52,9 @@ function pathnameOf(req: IncomingMessage): string {
 }
 
 function requireMcpAuth(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!mcpAuthEnabled) {
+    return true;
+  }
   const provided = extractApiKeyFromNodeRequest(req);
   if (isValidApiKey(provided, config.mcpApiKey)) {
     return true;
@@ -89,9 +92,15 @@ const host = "0.0.0.0";
 const { port } = config;
 
 httpServer.listen(port, host, () => {
+  if (!mcpAuthEnabled) {
+    logger.warn(
+      "MCP_API_KEY is not set — /mcp is publicly reachable. Anyone with the URL can use Gmail/Docs tools as this Google account.",
+    );
+  }
   logger.info(`${SERVER_NAME} v${SERVER_VERSION} listening`, {
     host,
     port,
+    mcpAuth: mcpAuthEnabled ? "enabled" : "disabled",
     health: `http://${host}:${port}/health`,
     mcp: `http://${host}:${port}/mcp`,
   });
