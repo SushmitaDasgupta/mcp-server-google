@@ -103,7 +103,7 @@ npm run build
 npm run start:stdio
 ```
 
-### Run the server (HTTP — Railway / remote clients)
+### Run the server (HTTP — Render / remote clients)
 
 ```bash
 npm run dev:http
@@ -152,12 +152,17 @@ After `npm run build`, you can point `command` at `node` and `args` at `dist/ind
 {
   "mcpServers": {
     "google-workspace": {
-      "url": "https://<service>.up.railway.app/mcp",
-      "headers": {
-        "Authorization": "Bearer <MCP_API_KEY>"
-      }
+      "url": "https://<service>.onrender.com/mcp"
     }
   }
+}
+```
+
+If you set `MCP_API_KEY` on Render, also send:
+
+```json
+"headers": {
+  "Authorization": "Bearer <MCP_API_KEY>"
 }
 ```
 
@@ -171,45 +176,53 @@ For HTTP:
 
 ```bash
 npm run dev:http
-# then point Inspector at http://localhost:3000/mcp with the API key header
+# then point Inspector at http://localhost:3000/mcp
 ```
 
-## Deploy on Railway
+## Deploy on Render
 
-See [docs/deployment-plan.md](docs/deployment-plan.md) for the full plan. Summary:
+This repo includes [`render.yaml`](render.yaml) for a Render Web Service.
 
-1. Push this repo to GitHub (private recommended).
-2. Railway → **New Project** → deploy from the repo.
-3. Build: `npm ci && npm run build` · Start: `npm start` (uses `railway.toml`).
-4. Generate a public domain; MCP URL is `https://<service>.up.railway.app/mcp`.
-5. Set service variables:
+| Setting | Value |
+|---|---|
+| Runtime | Node |
+| Build | `npm ci && npm run build` |
+| Start | `npm start` → `node dist/http.js` |
+| Health check | `/health` |
+| Node | `22` (see `.node-version`) |
+
+1. Connect [SushmitaDasgupta/mcp-server-google](https://github.com/SushmitaDasgupta/mcp-server-google) in Render (or apply the Blueprint).
+2. Public MCP URL: `https://<service>.onrender.com/mcp`
+3. Env vars are **optional** for boot/`/health`. Add later when tools should call Google:
 
 ```env
-NODE_ENV=production
-LOG_LEVEL=info
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REFRESH_TOKEN=...   # from local token.json after npm run auth
-# MCP_API_KEY=...          # optional; omit to leave /mcp open
+GOOGLE_REFRESH_TOKEN=...
+# MCP_API_KEY=...   # optional
 ```
 
-6. Smoke test:
+4. Smoke test:
 
 ```bash
-curl -sS https://<service>.up.railway.app/health
-curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://<service>.up.railway.app/mcp
-# expect 401 without API key
+curl -sS https://<service>.onrender.com/health
 ```
+
+Free-tier services may sleep when idle; the first request after idle can be slow.
 
 ### Runbook — rotate secrets
 
 | Secret | Rotation |
 |---|---|
-| `MCP_API_KEY` | Generate a new key, update Railway Variables + all client configs, redeploy if needed |
-| Google client secret | Create/rotate in Google Cloud Console, update `GOOGLE_CLIENT_SECRET` |
+| `MCP_API_KEY` | Generate a new key, update Render env + client configs |
+| Google client secret | Rotate in Google Cloud Console, update `GOOGLE_CLIENT_SECRET` |
 | Refresh token revoked | Run `npm run auth` locally, copy new `refresh_token` into `GOOGLE_REFRESH_TOKEN` |
 
-Treat `MCP_API_KEY` like a password: URL + key = Gmail send + Docs edit as the linked account.
+Treat a public `/mcp` URL (especially without `MCP_API_KEY`) as full access to the linked Google account’s Gmail/Docs tools.
+
+## Deploy on Railway (optional)
+
+See [docs/deployment-plan.md](docs/deployment-plan.md). Same build/start commands; `railway.toml` remains for Railway hosts.
 
 ## Available tools
 
