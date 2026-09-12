@@ -1,3 +1,7 @@
+# Railway deploy config for the Google Workspace MCP HTTP server.
+# Variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_TOKENS_JSON, MCP_API_KEY, …)
+# are set in the Railway dashboard — see docs/railway-deploy.md.
+
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm ci && npm run build"
@@ -7,3 +11,4 @@ startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

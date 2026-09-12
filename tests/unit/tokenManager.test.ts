@@ -19,10 +19,57 @@ async function tempTokenPath(): Promise<string> {
 }
 
 describe("TokenManager", () => {
-  it("falls back to env refresh token when file is missing", async () => {
+  it("falls back to GOOGLE_TOKENS_JSON when file is missing", async () => {
     const tokenPath = await tempTokenPath();
     const manager = new TokenManager({
       tokenPath,
+      envTokensJson: JSON.stringify({
+        refresh_token: "json-refresh",
+        access_token: "json-access",
+        expiry_date: 123,
+      }),
+      persistToDisk: false,
+    });
+
+    await expect(manager.load()).resolves.toEqual({
+      refresh_token: "json-refresh",
+      access_token: "json-access",
+      expiry_date: 123,
+    });
+  });
+
+  it("falls back to env refresh token when file and tokens JSON are missing", async () => {
+    const tokenPath = await tempTokenPath();
+    const manager = new TokenManager({
+      tokenPath,
+      envRefreshToken: "env-refresh",
+      persistToDisk: false,
+    });
+
+    await expect(manager.load()).resolves.toEqual({
+      refresh_token: "env-refresh",
+    });
+  });
+
+  it("prefers GOOGLE_TOKENS_JSON over GOOGLE_REFRESH_TOKEN", async () => {
+    const tokenPath = await tempTokenPath();
+    const manager = new TokenManager({
+      tokenPath,
+      envTokensJson: JSON.stringify({ refresh_token: "json-refresh" }),
+      envRefreshToken: "env-refresh",
+      persistToDisk: false,
+    });
+
+    await expect(manager.load()).resolves.toEqual({
+      refresh_token: "json-refresh",
+    });
+  });
+
+  it("ignores invalid GOOGLE_TOKENS_JSON and falls back to refresh token", async () => {
+    const tokenPath = await tempTokenPath();
+    const manager = new TokenManager({
+      tokenPath,
+      envTokensJson: "{not-json",
       envRefreshToken: "env-refresh",
       persistToDisk: false,
     });
@@ -36,6 +83,7 @@ describe("TokenManager", () => {
     const tokenPath = await tempTokenPath();
     const manager = new TokenManager({
       tokenPath,
+      envTokensJson: JSON.stringify({ refresh_token: "json-refresh" }),
       envRefreshToken: "env-refresh",
       persistToDisk: true,
     });
@@ -43,6 +91,7 @@ describe("TokenManager", () => {
 
     const reloaded = new TokenManager({
       tokenPath,
+      envTokensJson: JSON.stringify({ refresh_token: "json-refresh" }),
       envRefreshToken: "env-refresh",
       persistToDisk: true,
     });

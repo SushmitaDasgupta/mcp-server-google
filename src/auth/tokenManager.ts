@@ -12,7 +12,12 @@ export interface StoredTokens {
 
 export interface TokenManagerOptions {
   tokenPath: string;
-  /** Used when no token file exists (or file has no refresh token). */
+  /**
+   * Full token.json contents as a JSON string (Railway / production).
+   * Used when no token file exists (or file has no usable tokens).
+   */
+  envTokensJson?: string;
+  /** Used when no token file / GOOGLE_TOKENS_JSON exists. */
   envRefreshToken?: string;
   /** When false, load still works but save() is a no-op. */
   persistToDisk?: boolean;
@@ -20,6 +25,7 @@ export interface TokenManagerOptions {
 
 export class TokenManager {
   private readonly tokenPath: string;
+  private readonly envTokensJson?: string;
   private readonly envRefreshToken?: string;
   private readonly persistToDisk: boolean;
   /** In-memory copy so refresh updates work without disk in production. */
@@ -31,6 +37,7 @@ export class TokenManager {
       this.persistToDisk = true;
     } else {
       this.tokenPath = tokenPathOrOptions.tokenPath;
+      this.envTokensJson = tokenPathOrOptions.envTokensJson?.trim() || undefined;
       this.envRefreshToken = tokenPathOrOptions.envRefreshToken?.trim() || undefined;
       this.persistToDisk = tokenPathOrOptions.persistToDisk ?? true;
     }
@@ -47,6 +54,13 @@ export class TokenManager {
       return fromFile;
     }
 
+    const fromTokensJson = this.loadFromEnvTokensJson();
+    if (fromTokensJson?.refresh_token || fromTokensJson?.access_token) {
+      this.memoryTokens = fromTokensJson;
+      logger.info("Loaded Google tokens from GOOGLE_TOKENS_JSON env");
+      return fromTokensJson;
+    }
+
     if (this.envRefreshToken) {
       const fromEnv: StoredTokens = { refresh_token: this.envRefreshToken };
       this.memoryTokens = fromEnv;
@@ -55,6 +69,20 @@ export class TokenManager {
     }
 
     return fromFile;
+  }
+
+  private loadFromEnvTokensJson(): StoredTokens | null {
+    if (!this.envTokensJson) {
+      return null;
+    }
+    try {
+      return JSON.parse(this.envTokensJson) as StoredTokens;
+    } catch (error) {
+      logger.warn("Failed to parse GOOGLE_TOKENS_JSON", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+      return null;
+    }
   }
 
   async save(tokens: StoredTokens): Promise<void> {

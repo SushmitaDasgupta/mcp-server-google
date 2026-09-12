@@ -558,4 +558,5 @@ Layering (`Tools → Services → Google clients`) keeps new products (Sheets, C
 
 - [Problem Statement](./problemStatement.md) — full product requirements, schemas, and examples
 - [Deployment Plan](./deployment-plan.md) — Railway HTTP deploy plan
+- [Railway deploy](./railway-deploy.md) — operational Railway runbook
 - [README](../README.md) — setup, OAuth, running locally, connecting agents

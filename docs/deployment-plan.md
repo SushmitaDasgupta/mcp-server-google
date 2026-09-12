@@ -109,10 +109,10 @@ Interactive browser OAuth (`npm run auth`) does not work well as the primary Rai
 2. Store on Railway Variables:
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
-   - `GOOGLE_REFRESH_TOKEN` (from `token.json`)
-3. Update `TokenManager` / `GoogleAuth` to:
-   - Prefer `GOOGLE_REFRESH_TOKEN` from env when no writable token file exists.
-   - Optionally persist refreshed access tokens to a volume or skip disk writes in production.
+   - `GOOGLE_TOKENS_JSON` (full contents of local `token.json`, as one JSON string)
+3. `TokenManager` / `GoogleAuth`:
+   - Prefer file tokens when present; else load `GOOGLE_TOKENS_JSON`; else `GOOGLE_REFRESH_TOKEN`.
+   - Skip disk writes in production when env tokens are set (ephemeral FS).
 
 **Avoid:** relying on ephemeral container disk for `token.json` alone — Railway filesystems are not durable across redeploys unless you attach a volume.
 
@@ -130,8 +130,9 @@ Interactive browser OAuth (`npm run auth`) does not work well as the primary Rai
 | `LOG_LEVEL` | `info` |
 | `GOOGLE_CLIENT_ID` | From Google Cloud |
 | `GOOGLE_CLIENT_SECRET` | From Google Cloud |
-| `GOOGLE_REFRESH_TOKEN` | From local `token.json` |
-| `GOOGLE_REDIRECT_URI` | Keep for local re-auth; not required at runtime if refresh token is present |
+| `GOOGLE_TOKENS_JSON` | Full local `token.json` JSON string |
+| `GOOGLE_REFRESH_TOKEN` | Optional fallback (refresh token only) |
+| `GOOGLE_REDIRECT_URI` | Keep for local re-auth; not required at runtime if tokens are present |
 | `MCP_API_KEY` | Long random secret |
 | `GOOGLE_TOKEN_PATH` | Optional; use only with a Volume |
 
@@ -205,7 +206,7 @@ LOG_LEVEL=info
 
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REFRESH_TOKEN=...
+GOOGLE_TOKENS_JSON=...   # full token.json as one JSON string
 
 MCP_API_KEY=...   # generate: openssl rand -hex 32
 ```
@@ -213,6 +214,7 @@ MCP_API_KEY=...   # generate: openssl rand -hex 32
 Optional:
 
 ```env
+GOOGLE_REFRESH_TOKEN=...             # fallback if GOOGLE_TOKENS_JSON unset
 GOOGLE_TOKEN_PATH=/data/token.json   # only if Volume attached
 GOOGLE_REDIRECT_URI=https://<domain>/oauth2callback   # only if hosted OAuth added
 ```
@@ -286,8 +288,8 @@ Manual tool checks:
 
 ### Token refresh
 
-- Access tokens expire; refresh must work from `GOOGLE_REFRESH_TOKEN`.
-- Monitor logs for `AUTHENTICATION_REQUIRED`; re-run local auth and update Railway var if refresh token is revoked.
+- Access tokens expire; refresh must work from `GOOGLE_TOKENS_JSON` / `GOOGLE_REFRESH_TOKEN`.
+- Monitor logs for `AUTHENTICATION_REQUIRED`; re-run local auth and update Railway `GOOGLE_TOKENS_JSON` if the refresh token is revoked.
 
 ### Idempotency
 
@@ -309,7 +311,7 @@ Manual tool checks:
 
 | Phase | Work | Exit criteria |
 |---|---|---|
-| **0 — Prep** | HTTP entrypoint, API key middleware, env-based refresh token, `/health` | Local `npm run dev:http` works with Inspector |
+| **0 — Prep** | HTTP entrypoint, API key middleware, env tokens (`GOOGLE_TOKENS_JSON`), `/health` | Local `npm run dev:http` works with Inspector |
 | **1 — Railway wire-up** | GitHub connect, build/start, vars, public domain | `/health` returns 200 on Railway URL |
 | **2 — Auth smoke** | Client connects with API key; `tools/list` succeeds | All 3 tools visible remotely |
 | **3 — Capability smoke** | Remote `gmail_draft_email` + Docs append | Success envelopes; no secret leakage in logs |
@@ -318,19 +320,20 @@ Manual tool checks:
 
 ---
 
-## 11. Suggested File Changes (implementation backlog)
+## 11. File layout (Railway-aligned)
 
 ```text
-src/http.ts                  # NEW — Railway HTTP entry
-src/mcp/server.ts            # reuse factory as-is
-src/auth/googleAuth.ts       # accept GOOGLE_REFRESH_TOKEN from env
-src/auth/tokenManager.ts     # optional no-disk / volume mode
-src/middleware/apiKey.ts     # NEW — MCP_API_KEY gate
-package.json                 # start → dist/http.js
-railway.toml                 # optional
-Dockerfile                   # optional
+src/http.ts                  # Railway HTTP entry (npm start)
+src/index.ts                 # local stdio entry
+src/auth/googleAuth.ts       # GOOGLE_TOKENS_JSON / GOOGLE_REFRESH_TOKEN
+src/auth/tokenManager.ts     # file + env load; optional no-disk persist
+src/middleware/apiKey.ts     # MCP_API_KEY gate on /mcp
+railway.toml                 # Nixpacks build/start + /health
+Dockerfile                   # optional container build
+docs/railway-deploy.md       # operational runbook
 docs/deployment-plan.md      # this file
-README.md                    # add “Deploy on Railway” section after impl
+README.md                    # Deploy on Railway
+.env.example                 # documents Railway variables
 ```
 
 Local stdio path (`src/index.ts`) stays for desktop MCP configs.
@@ -339,15 +342,15 @@ Local stdio path (`src/index.ts`) stays for desktop MCP configs.
 
 ## 12. Definition of Done (Railway)
 
-- [ ] Service builds and stays healthy on Railway
-- [ ] `GET /health` returns 200
-- [ ] `POST /mcp` requires API key
+- [x] Service builds and stays healthy on Railway
+- [x] `GET /health` returns 200
+- [ ] `POST /mcp` requires API key (set `MCP_API_KEY` in Railway)
 - [ ] Cursor (or Inspector) lists all three tools over HTTPS
 - [ ] `gmail_draft_email` works against the linked Google account
 - [ ] `google_docs_append_content` works on a test Doc
-- [ ] No secrets in git or build logs
-- [ ] README documents remote URL + client header setup
-- [ ] Runbook exists for refresh-token revocation and key rotation
+- [x] No secrets in git or build logs
+- [x] README documents remote URL + client header setup
+- [x] Runbook exists for token revocation and key rotation (`docs/railway-deploy.md`)
 
 ---
 
@@ -356,7 +359,7 @@ Local stdio path (`src/index.ts`) stays for desktop MCP configs.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Deploying stdio as-is | Service “runs” but no client can connect | Ship HTTP transport first |
-| Ephemeral `token.json` | Auth breaks on redeploy | Use `GOOGLE_REFRESH_TOKEN` env (or Volume) |
+| Ephemeral `token.json` | Auth breaks on redeploy | Use `GOOGLE_TOKENS_JSON` env (or Volume) |
 | Open `/mcp` without API key | Anyone can send mail as you | Mandatory `MCP_API_KEY` |
 | Refresh token revoked | All tools fail with auth errors | Re-auth locally; update Railway var |
 | Multi-replica idempotency gaps | Duplicate sends | Single replica V1; external store later |
@@ -371,7 +374,7 @@ Local stdio path (`src/index.ts`) stays for desktop MCP configs.
 | Platform | Railway (HTTPS web service) |
 | MCP transport | Streamable HTTP on `/mcp` |
 | Local support | Keep stdio entry for desktop |
-| Google auth | Env `GOOGLE_REFRESH_TOKEN` from one-time local OAuth |
+| Google auth | Env `GOOGLE_TOKENS_JSON` from one-time local OAuth |
 | MCP auth | Shared `MCP_API_KEY` |
 | Replicas | 1 |
 | Docs/Gmail verification | Draft + append before enabling routine sends |
@@ -380,6 +383,6 @@ Local stdio path (`src/index.ts`) stays for desktop MCP configs.
 
 ## 15. Next Action
 
-Implement **Phase 0** code changes (`src/http.ts`, API key gate, env refresh token), verify locally with MCP Inspector over HTTP, then connect the GitHub repo to Railway and apply the Variables checklist in §6.
+Service is live on Railway. Complete remaining checklist items in §12: set `GOOGLE_TOKENS_JSON` + `MCP_API_KEY`, then verify tools over HTTPS (see [railway-deploy.md](./railway-deploy.md)).
 
-Related: [architecture.md](./architecture.md) · [README.md](../README.md)
+Related: [architecture.md](./architecture.md) · [railway-deploy.md](./railway-deploy.md) · [README.md](../README.md)

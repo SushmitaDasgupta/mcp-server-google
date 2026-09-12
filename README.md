@@ -103,7 +103,7 @@ npm run build
 npm run start:stdio
 ```
 
-### Run the server (HTTP — Render / remote clients)
+### Run the server (HTTP — Railway / remote clients)
 
 ```bash
 npm run dev:http
@@ -123,7 +123,7 @@ Logs go to **stderr** (stdout is reserved for MCP JSON-RPC on stdio).
 
 ## Connect an MCP client
 
-### Cursor
+### Cursor (local stdio)
 
 Add to MCP settings (example):
 
@@ -137,7 +137,7 @@ Add to MCP settings (example):
         "GOOGLE_CLIENT_ID": "your-client-id",
         "GOOGLE_CLIENT_SECRET": "your-client-secret",
         "GOOGLE_REDIRECT_URI": "http://localhost:3000/oauth2callback",
-        "GOOGLE_TOKEN_PATH": "/absolute/path/to/MCP Server/.tokens/google-tokens.json"
+        "GOOGLE_TOKEN_PATH": "/absolute/path/to/MCP Server/token.json"
       }
     }
   }
@@ -146,25 +146,22 @@ Add to MCP settings (example):
 
 After `npm run build`, you can point `command` at `node` and `args` at `dist/index.js`.
 
-### Cursor (remote HTTP)
+### Cursor (remote HTTP — Railway)
 
 ```json
 {
   "mcpServers": {
     "google-workspace": {
-      "url": "https://<service>.onrender.com/mcp"
+      "url": "https://<service>.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer <MCP_API_KEY>"
+      }
     }
   }
 }
 ```
 
-If you set `MCP_API_KEY` on Render, also send:
-
-```json
-"headers": {
-  "Authorization": "Bearer <MCP_API_KEY>"
-}
-```
+Omit `headers` only if `MCP_API_KEY` is unset (not recommended for a public URL).
 
 ### MCP Inspector
 
@@ -179,50 +176,51 @@ npm run dev:http
 # then point Inspector at http://localhost:3000/mcp
 ```
 
-## Deploy on Render
+## Deploy on Railway
 
-This repo includes [`render.yaml`](render.yaml) for a Render Web Service.
+This repo includes [`railway.toml`](railway.toml). Operational notes: [docs/railway-deploy.md](docs/railway-deploy.md). Design checklist: [docs/deployment-plan.md](docs/deployment-plan.md).
 
 | Setting | Value |
 |---|---|
-| Runtime | Node |
+| Builder | Nixpacks |
 | Build | `npm ci && npm run build` |
 | Start | `npm start` → `node dist/http.js` |
 | Health check | `/health` |
 | Node | `22` (see `.node-version`) |
 
-1. Connect [SushmitaDasgupta/mcp-server-google](https://github.com/SushmitaDasgupta/mcp-server-google) in Render (or apply the Blueprint).
-2. Public MCP URL: `https://<service>.onrender.com/mcp`
-3. Env vars are **optional** for boot/`/health`. Add later when tools should call Google:
+1. Connect the GitHub repo in Railway and deploy from `main`.
+2. Public MCP URL: `https://<service>.up.railway.app/mcp`
+3. Set Variables (boot/`/health` work without Google secrets; tools need them):
 
 ```env
+NODE_ENV=production
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REFRESH_TOKEN=...
-# MCP_API_KEY=...   # optional
+GOOGLE_TOKENS_JSON=...   # full token.json as one JSON string
+MCP_API_KEY=...          # recommended
+```
+
+Generate `GOOGLE_TOKENS_JSON` after local `npm run auth`:
+
+```bash
+node -e "console.log(JSON.stringify(JSON.parse(require('fs').readFileSync('token.json','utf8'))))"
 ```
 
 4. Smoke test:
 
 ```bash
-curl -sS https://<service>.onrender.com/health
+curl -sS https://<service>.up.railway.app/health
 ```
-
-Free-tier services may sleep when idle; the first request after idle can be slow.
 
 ### Runbook — rotate secrets
 
 | Secret | Rotation |
 |---|---|
-| `MCP_API_KEY` | Generate a new key, update Render env + client configs |
+| `MCP_API_KEY` | Generate a new key, update Railway Variables + client configs |
 | Google client secret | Rotate in Google Cloud Console, update `GOOGLE_CLIENT_SECRET` |
-| Refresh token revoked | Run `npm run auth` locally, copy new `refresh_token` into `GOOGLE_REFRESH_TOKEN` |
+| Tokens revoked | Run `npm run auth` locally, replace `GOOGLE_TOKENS_JSON` |
 
 Treat a public `/mcp` URL (especially without `MCP_API_KEY`) as full access to the linked Google account’s Gmail/Docs tools.
-
-## Deploy on Railway (optional)
-
-See [docs/deployment-plan.md](docs/deployment-plan.md). Same build/start commands; `railway.toml` remains for Railway hosts.
 
 ## Available tools
 
@@ -323,7 +321,7 @@ Unit tests cover validation, MIME/Base64URL encoding, Docs append request constr
 
 | Issue | Fix |
 |---|---|
-| `AUTHENTICATION_REQUIRED` | Run `npm run auth` or set `GOOGLE_REFRESH_TOKEN`; ensure OAuth client env vars are set |
+| `AUTHENTICATION_REQUIRED` | Run `npm run auth` or set `GOOGLE_TOKENS_JSON`; ensure OAuth client env vars are set |
 | `401` on `/mcp` | Set/send `MCP_API_KEY` as Bearer or `X-API-Key` |
 | `PERMISSION_DENIED` on Docs | Confirm the signed-in account can edit the document |
 | `DOCUMENT_NOT_FOUND` | Check the document ID from the Docs URL |

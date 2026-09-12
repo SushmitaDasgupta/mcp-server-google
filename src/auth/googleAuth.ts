@@ -19,6 +19,7 @@ export class GoogleAuth {
   constructor(private readonly config: AppConfig) {
     this.tokenManager = new TokenManager({
       tokenPath: config.googleTokenPath,
+      envTokensJson: config.googleTokensJson || undefined,
       envRefreshToken: config.googleRefreshToken || undefined,
       persistToDisk: config.googleTokenPersist,
     });
@@ -67,7 +68,7 @@ export class GoogleAuth {
     if (!tokens?.refresh_token && !tokens?.access_token) {
       throw new AppError(
         "AUTHENTICATION_REQUIRED",
-        "Google authentication is required. Run `npm run auth` locally, or set GOOGLE_REFRESH_TOKEN.",
+        "Google authentication is required. Run `npm run auth` locally, or set GOOGLE_TOKENS_JSON.",
       );
     }
 

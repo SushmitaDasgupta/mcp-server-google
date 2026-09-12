@@ -89,7 +89,8 @@ async function main(): Promise<void> {
     "Tokens saved. You can now start the MCP server with `npm run dev` (stdio) or `npm run dev:http`.\n",
   );
   console.error(
-    "For Railway: copy refresh_token from your token file into GOOGLE_REFRESH_TOKEN.\n",
+    "For Railway: paste the full contents of your token file into GOOGLE_TOKENS_JSON.\n" +
+      '  node -e "console.log(JSON.stringify(JSON.parse(require(\'fs\').readFileSync(\'token.json\',\'utf8\'))))"\n',
   );
 }
 
