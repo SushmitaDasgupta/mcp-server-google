@@ -1,0 +1,47 @@
+{
+  "name": "google-workspace-mcp",
+  "version": "1.0.0",
+  "description": "Generic MCP server for Gmail and Google Docs",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "google-workspace-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "dev:http": "tsx src/http.ts",
+    "build": "tsc",
+    "start": "node dist/http.js",
+    "start:stdio": "node dist/index.js",
+    "auth": "tsx src/scripts/auth.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "gmail",
+    "google-docs",
+    "google-workspace"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "dotenv": "^17.4.2",
+    "google-auth-library": "^11.0.2",
+    "googleapis": "^180.0.0",
+    "hono": "^4.13.7",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^22.20.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
